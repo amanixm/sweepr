@@ -129,6 +129,14 @@ def organize(
             rich_help_panel="Scan",
         ),
     ] = False,
+    exclude: Annotated[
+        str | None,
+        typer.Option(
+            "--exclude",
+            help="Comma-separated glob patterns or paths to skip, such as node_modules,*.tmp.",
+            rich_help_panel="Scan",
+        ),
+    ] = None,
     verbose: Annotated[
         bool,
         typer.Option(
@@ -145,7 +153,7 @@ def organize(
 
     try:
         with console.status("[bold cyan]Scanning files...[/bold cyan]", spinner="dots"):
-            plan = create_plan(path, mode=mode, recursive=recursive)
+            plan = create_plan(path, mode=mode, recursive=recursive, exclude=exclude)
     except SweeprError as exc:
         _print_error("Unable to create organization plan", str(exc))
         raise typer.Exit(code=1) from exc

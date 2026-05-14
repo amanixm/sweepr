@@ -8,6 +8,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
+from fnmatch import fnmatch
 from pathlib import Path
 from typing import Any
 
@@ -228,6 +229,7 @@ class UndoResult:
 
 ProgressCallback = Callable[[MoveOperation, Path | None, str | None], None]
 UndoCallback = Callable[[Path, Path, str | None], None]
+ExcludeInput = str | list[str] | tuple[str, ...]
 
 
 def categorize_file(path: Path) -> str:
@@ -240,11 +242,17 @@ def categorize_file(path: Path) -> str:
     return "Other"
 
 
-def create_plan(path: str | Path, mode: OrganizeMode, recursive: bool = False) -> SweepPlan:
+def create_plan(
+    path: str | Path,
+    mode: OrganizeMode,
+    recursive: bool = False,
+    exclude: ExcludeInput | None = None,
+) -> SweepPlan:
     """Create a deterministic move plan without touching the filesystem."""
 
     root = _normalize_root(path)
     organization_mode = OrganizeMode(mode)
+    exclude_patterns = _normalize_exclude_patterns(exclude)
     metadata_dir = root / MANIFEST_DIR_NAME
     reserved_destinations: set[Path] = set()
     operations: list[MoveOperation] = []
@@ -252,6 +260,19 @@ def create_plan(path: str | Path, mode: OrganizeMode, recursive: bool = False) -
 
     for source in _iter_candidate_files(root, recursive=recursive):
         if _is_under(source, metadata_dir):
+            continue
+
+        if matched_pattern := _matching_exclude_pattern(
+            source,
+            root=root,
+            patterns=exclude_patterns,
+        ):
+            skipped.append(
+                SkippedEntry(
+                    path=source,
+                    reason=f"excluded by pattern: {matched_pattern}",
+                )
+            )
             continue
 
         if source.is_symlink():
@@ -455,6 +476,68 @@ def _normalize_root(path: str | Path) -> Path:
 def _iter_candidate_files(root: Path, *, recursive: bool) -> tuple[Path, ...]:
     iterator = root.rglob("*") if recursive else root.iterdir()
     return tuple(path for path in iterator if path.is_file() or path.is_symlink())
+
+
+def _normalize_exclude_patterns(exclude: ExcludeInput | None) -> tuple[str, ...]:
+    if exclude is None:
+        return ()
+
+    raw_patterns = [exclude] if isinstance(exclude, str) else list(exclude)
+    patterns: list[str] = []
+
+    for raw_pattern in raw_patterns:
+        for pattern in raw_pattern.split(","):
+            normalized = pattern.strip().rstrip("/\\")
+            if normalized.startswith(("./", ".\\")):
+                normalized = normalized[2:]
+            if normalized:
+                patterns.append(normalized)
+
+    return tuple(patterns)
+
+
+def _matching_exclude_pattern(path: Path, *, root: Path, patterns: tuple[str, ...]) -> str | None:
+    if not patterns:
+        return None
+
+    relative = path.relative_to(root)
+    relative_posix = relative.as_posix()
+    absolute_posix = path.as_posix()
+
+    for pattern in patterns:
+        pattern_path = Path(pattern).expanduser()
+        pattern_posix = pattern.replace("\\", "/")
+
+        if pattern_path.is_absolute():
+            resolved_pattern = pattern_path.resolve(strict=False)
+            if _has_glob(pattern) and fnmatch(absolute_posix, resolved_pattern.as_posix()):
+                return pattern
+            if not _has_glob(pattern) and (
+                path == resolved_pattern or _is_under(path, resolved_pattern)
+            ):
+                return pattern
+            continue
+
+        if "/" not in pattern_posix:
+            if any(fnmatch(part, pattern_posix) for part in relative.parts):
+                return pattern
+            if fnmatch(relative_posix, pattern_posix):
+                return pattern
+            continue
+
+        relative_pattern = pattern_posix.strip("/")
+        if not _has_glob(relative_pattern) and (
+            relative_posix == relative_pattern or relative_posix.startswith(f"{relative_pattern}/")
+        ):
+            return pattern
+        if fnmatch(relative_posix, relative_pattern):
+            return pattern
+
+    return None
+
+
+def _has_glob(pattern: str) -> bool:
+    return any(character in pattern for character in "*?[")
 
 
 def _destination_for(

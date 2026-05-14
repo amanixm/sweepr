@@ -5,8 +5,12 @@ from datetime import datetime
 from pathlib import Path
 
 import pytest
+from typer.testing import CliRunner
 
+from sweepr.cli import app
 from sweepr.core import OrganizeMode, create_plan, execute_plan, undo
+
+runner = CliRunner()
 
 
 def touch(path: Path, content: str = "data") -> Path:
@@ -115,6 +119,46 @@ def test_recursive_plan_includes_nested_files(tmp_path: Path) -> None:
 
     assert plan.operations[0].source == nested
     assert plan.operations[0].destination == tmp_path / "Videos" / "clip.mp4"
+
+
+def test_exclude_skips_recursive_directory(tmp_path: Path) -> None:
+    ignored = touch(tmp_path / "node_modules" / "package.json")
+    included = touch(tmp_path / "src" / "app.py")
+
+    plan = create_plan(
+        tmp_path,
+        mode=OrganizeMode.TYPE,
+        recursive=True,
+        exclude=["node_modules"],
+    )
+
+    destinations = {operation.source: operation.destination for operation in plan.operations}
+    assert ignored not in destinations
+    assert destinations[included] == tmp_path / "Code" / "app.py"
+    assert any(entry.path == ignored and "node_modules" in entry.reason for entry in plan.skipped)
+
+
+def test_cli_exclude_glob_respects_dry_run(tmp_path: Path) -> None:
+    excluded = touch(tmp_path / "scratch.tmp")
+    included = touch(tmp_path / "photo.png")
+
+    result = runner.invoke(
+        app,
+        [
+            "organize",
+            str(tmp_path),
+            "--by-type",
+            "--dry-run",
+            "--exclude",
+            "*.tmp",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert excluded.exists()
+    assert included.exists()
+    assert not (tmp_path / "Others" / "scratch.tmp").exists()
+    assert not (tmp_path / "Images" / "photo.png").exists()
 
 
 def test_undo_without_manifest_raises_user_facing_error(tmp_path: Path) -> None:
