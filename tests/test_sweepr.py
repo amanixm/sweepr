@@ -28,6 +28,46 @@ def test_create_type_plan_groups_known_extensions(tmp_path: Path) -> None:
     assert destinations[unknown] == tmp_path / "Other" / "backup.xyz"
 
 
+def test_create_type_plan_groups_expanded_file_types(tmp_path: Path) -> None:
+    audio = touch(tmp_path / "song.flac")
+    code = touch(tmp_path / "config.yaml")
+    archive = touch(tmp_path / "package.bz2")
+    other = touch(tmp_path / "debug.log")
+    text = touch(tmp_path / "notes.txt")
+
+    plan = create_plan(tmp_path, mode=OrganizeMode.TYPE)
+
+    destinations = {operation.source: operation.destination for operation in plan.operations}
+    assert destinations[audio] == tmp_path / "Audio" / "song.flac"
+    assert destinations[code] == tmp_path / "Code" / "config.yaml"
+    assert destinations[archive] == tmp_path / "Archives" / "package.bz2"
+    assert destinations[other] == tmp_path / "Others" / "debug.log"
+    assert destinations[text] == tmp_path / "Documents" / "notes.txt"
+
+
+def test_new_file_types_support_dry_run_apply_and_undo(tmp_path: Path) -> None:
+    source = touch(tmp_path / "debug.log", "trace")
+    plan = create_plan(tmp_path, mode=OrganizeMode.TYPE)
+
+    dry_run_result = execute_plan(plan, dry_run=True)
+
+    assert dry_run_result.moved == 0
+    assert source.exists()
+    assert not (tmp_path / "Others" / "debug.log").exists()
+
+    apply_result = execute_plan(plan, dry_run=False)
+
+    destination = tmp_path / "Others" / "debug.log"
+    assert apply_result.moved == 1
+    assert destination.read_text(encoding="utf-8") == "trace"
+
+    undo_result = undo(tmp_path)
+
+    assert undo_result.restored == 1
+    assert source.read_text(encoding="utf-8") == "trace"
+    assert not destination.exists()
+
+
 def test_dry_run_does_not_move_files(tmp_path: Path) -> None:
     source = touch(tmp_path / "photo.png")
     plan = create_plan(tmp_path, mode=OrganizeMode.TYPE)

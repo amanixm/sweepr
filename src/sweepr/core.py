@@ -15,7 +15,7 @@ MANIFEST_DIR_NAME = ".sweepr"
 LATEST_MANIFEST_NAME = "latest.json"
 MANIFEST_PREFIX = "undo-"
 
-CATEGORY_EXTENSIONS: dict[str, set[str]] = {
+FILE_TYPES: dict[str, set[str]] = {
     "Images": {
         ".avif",
         ".bmp",
@@ -135,7 +135,17 @@ CATEGORY_EXTENSIONS: dict[str, set[str]] = {
         ".pkg",
         ".rpm",
     },
+    "Others": {
+        ".bak",
+        ".crdownload",
+        ".log",
+        ".old",
+        ".part",
+        ".tmp",
+    },
 }
+
+CATEGORY_EXTENSIONS = FILE_TYPES
 
 
 class SweeprError(Exception):
@@ -224,7 +234,7 @@ def categorize_file(path: Path) -> str:
     """Return the destination category for a file path."""
 
     suffix = path.suffix.lower()
-    for category, extensions in CATEGORY_EXTENSIONS.items():
+    for category, extensions in FILE_TYPES.items():
         if suffix in extensions:
             return category
     return "Other"
