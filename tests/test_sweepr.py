@@ -8,7 +8,14 @@ import pytest
 from typer.testing import CliRunner
 
 from sweepr.cli import app
-from sweepr.core import OrganizeMode, create_plan, execute_plan, undo
+from sweepr.core import (
+    OrganizeMode,
+    create_plan,
+    execute_plan,
+    list_file_types,
+    summarize_plan_by_category,
+    undo,
+)
 
 runner = CliRunner()
 
@@ -159,6 +166,49 @@ def test_cli_exclude_glob_respects_dry_run(tmp_path: Path) -> None:
     assert included.exists()
     assert not (tmp_path / "Others" / "scratch.tmp").exists()
     assert not (tmp_path / "Images" / "photo.png").exists()
+
+
+def test_list_file_types_returns_supported_categories() -> None:
+    categories = {category.name: category.extensions for category in list_file_types()}
+
+    assert ".png" in categories["Images"]
+    assert ".py" in categories["Code"]
+    assert ".zip" in categories["Archives"]
+
+
+def test_types_command_lists_file_categories() -> None:
+    result = runner.invoke(app, ["types"])
+
+    assert result.exit_code == 0
+    assert "Supported file categories" in result.output
+    assert "Images" in result.output
+    assert ".png" in result.output
+    assert "Code" in result.output
+
+
+def test_plan_category_summary_counts_files_by_folder(tmp_path: Path) -> None:
+    touch(tmp_path / "photo.png")
+    touch(tmp_path / "icon.jpg")
+    touch(tmp_path / "notes.pdf")
+
+    plan = create_plan(tmp_path, mode=OrganizeMode.TYPE)
+    summaries = {summary.category: summary for summary in summarize_plan_by_category(plan)}
+
+    assert summaries["Images"].files == 2
+    assert summaries["Images"].folder == tmp_path / "Images"
+    assert summaries["Documents"].files == 1
+
+
+def test_cli_dry_run_prints_category_summary(tmp_path: Path) -> None:
+    touch(tmp_path / "photo.png")
+    touch(tmp_path / "notes.pdf")
+
+    result = runner.invoke(app, ["organize", str(tmp_path), "--by-type", "--dry-run"])
+
+    assert result.exit_code == 0
+    assert "Category summary" in result.output
+    assert "Images" in result.output
+    assert "Documents" in result.output
 
 
 def test_undo_without_manifest_raises_user_facing_error(tmp_path: Path) -> None:

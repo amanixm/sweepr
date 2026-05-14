@@ -34,6 +34,8 @@ from sweepr.core import (
     create_plan,
     execute_plan,
     format_size,
+    list_file_types,
+    summarize_plan_by_category,
 )
 from sweepr.core import (
     undo as undo_sweep,
@@ -48,6 +50,7 @@ APP_HELP = """
   sweepr organize ~/Downloads --by-type --dry-run
   sweepr organize ~/Downloads --by-type --recursive --apply
   sweepr organize ~/Downloads --by-date --dry-run
+  sweepr types
   sweepr undo ~/Downloads
 """
 
@@ -164,6 +167,7 @@ def organize(
         _print_skipped(plan.skipped)
 
     if dry_run:
+        _print_category_summary(plan)
         result = execute_plan(plan, dry_run=True)
         console.print(
             Panel.fit(
@@ -181,6 +185,29 @@ def organize(
     if result.errors:
         _print_errors(result.errors, verbose=verbose)
         raise typer.Exit(code=1)
+
+
+@app.command(name="types", help="Show all supported file categories and extensions.")
+def list_types() -> None:
+    """Print supported file categories."""
+
+    table = Table(
+        title="Supported file categories",
+        box=box.ROUNDED,
+        show_lines=False,
+    )
+    table.add_column("Category", style="bold cyan", no_wrap=True)
+    table.add_column("Extensions", overflow="fold")
+    table.add_column("Count", justify="right")
+
+    for category in list_file_types():
+        table.add_row(
+            category.name,
+            ", ".join(category.extensions),
+            str(len(category.extensions)),
+        )
+
+    console.print(table)
 
 
 @app.command(help="Restore files from the latest sweepr undo manifest.")
@@ -289,6 +316,28 @@ def _print_plan(plan: SweepPlan) -> None:
             "",
             "",
             style="dim",
+        )
+
+    console.print(table)
+
+
+def _print_category_summary(plan: SweepPlan) -> None:
+    summaries = summarize_plan_by_category(plan)
+    if not summaries:
+        return
+
+    table = Table(title="Category summary", box=box.ROUNDED)
+    table.add_column("Category", style="bold cyan")
+    table.add_column("Folder", overflow="fold")
+    table.add_column("Files", justify="right")
+    table.add_column("Size", justify="right")
+
+    for summary in summaries:
+        table.add_row(
+            summary.category,
+            _display_path(summary.folder),
+            str(summary.files),
+            format_size(summary.size),
         )
 
     console.print(table)

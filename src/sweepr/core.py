@@ -179,6 +179,24 @@ class MoveOperation:
 
 
 @dataclass(frozen=True, slots=True)
+class FileTypeCategory:
+    """A supported file category and its extensions."""
+
+    name: str
+    extensions: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class CategorySummary:
+    """A planned move count and size for a destination category."""
+
+    category: str
+    folder: Path
+    files: int
+    size: int
+
+
+@dataclass(frozen=True, slots=True)
 class SkippedEntry:
     """A file that was deliberately skipped while planning."""
 
@@ -240,6 +258,15 @@ def categorize_file(path: Path) -> str:
         if suffix in extensions:
             return category
     return "Other"
+
+
+def list_file_types() -> tuple[FileTypeCategory, ...]:
+    """Return supported file categories and extensions in display order."""
+
+    return tuple(
+        FileTypeCategory(name=category, extensions=tuple(sorted(extensions)))
+        for category, extensions in FILE_TYPES.items()
+    )
 
 
 def create_plan(
@@ -314,6 +341,34 @@ def create_plan(
         recursive=recursive,
         operations=tuple(operations),
         skipped=tuple(skipped),
+    )
+
+
+def summarize_plan_by_category(plan: SweepPlan) -> tuple[CategorySummary, ...]:
+    """Summarize planned moves by their target category or folder."""
+
+    grouped: dict[str, dict[str, Any]] = {}
+
+    for operation in plan.operations:
+        summary = grouped.setdefault(
+            operation.category,
+            {
+                "folder": operation.destination.parent,
+                "files": 0,
+                "size": 0,
+            },
+        )
+        summary["files"] += 1
+        summary["size"] += operation.size
+
+    return tuple(
+        CategorySummary(
+            category=category,
+            folder=values["folder"],
+            files=values["files"],
+            size=values["size"],
+        )
+        for category, values in sorted(grouped.items())
     )
 
 

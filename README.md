@@ -17,8 +17,10 @@ Dry-run is the default. Files are only moved when you pass `--apply`.
 - Organize by type: `Images`, `Documents`, `Videos`, `Archives`, `Audio`, `Code`, and more.
 - Organize by modification date into `YYYY/MM/`.
 - Safe preview mode with Rich tables.
+- Category summaries for dry-run previews.
 - Recursive scanning for nested inbox folders.
 - Undo support using `.sweepr` manifests.
+- `sweepr types` command for supported file categories.
 - Collision-safe destination names.
 - Friendly errors, progress indicators, and summary reports.
 - Modern `src/` package layout with Typer, Rich, pytest, Ruff, and GitHub Actions.
@@ -79,6 +81,12 @@ Preview organizing by modification date:
 
 ```bash
 sweepr organize ~/Downloads --by-date --dry-run
+```
+
+List supported file categories and extensions:
+
+```bash
+sweepr types
 ```
 
 Undo the latest applied sweep:
@@ -146,6 +154,10 @@ Format code:
 ```bash
 ruff format .
 ```
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ## License
 
