@@ -1,0 +1,69 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sweepr"
+version = "0.1.0"
+description = "A smart, safe file organizer for your terminal."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [
+  { name = "sweepr contributors" },
+]
+keywords = ["cli", "files", "organizer", "productivity", "typer", "rich"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Intended Audience :: End Users/Desktop",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Desktop Environment :: File Managers",
+  "Topic :: Utilities",
+  "Typing :: Typed",
+]
+dependencies = [
+  "rich>=13.9.0",
+  "typer>=0.16.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3.0",
+  "ruff>=0.9.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/amanixm/sweepr"
+Issues = "https://github.com/amanixm/sweepr/issues"
+Source = "https://github.com/amanixm/sweepr"
+
+[project.scripts]
+sweepr = "sweepr.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sweepr"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["B", "C4", "E", "F", "I", "RUF", "SIM", "UP"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
